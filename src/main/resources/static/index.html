@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <a href = "/files">Show files</a>
+
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+        File to upload: <input type="file" name="file"><br />
+        Name: <input type="text" name="name"><br /> <br />
+        <input type="submit" value="Upload"> Press here to upload the file!
+    </form>
+
+    <br/>
+    <br/>
+    <br/>
+    <br/>
+
+    <form action="/download" method="POST">
+        Id: <input type="text" name="id"><br /> <br />
+        <input type="submit" value="Download"> Press here to download the file!
+    </form>
+</body>
+</html>

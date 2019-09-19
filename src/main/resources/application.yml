@@ -1,0 +1,23 @@
+security:
+  oauth2:
+    client:
+      clientId: 888139963687-j5tepaq7mdq490qm90t26cknqtmm6pt6.apps.googleusercontent.com
+      clientSecret: 7_FLErDkAfAa5rFXhWhaYolo
+      accessTokenUri: https://oauth2.googleapis.com/token
+      userAuthorizationUri: https://accounts.google.com/o/oauth2/auth
+      tokenName: oauth_token
+      authenticationScheme: query
+      clientAuthenticationScheme: form
+      scope: profile email
+    resource:
+      userInfoUri: https://www.googleapis.com/userinfo/v2/me
+      preferTokenInfo: false
+spring:
+  servlet:
+    multipart:
+      enabled: true # Whether to enable support of multipart uploads.
+      file-size-threshold: 0 # Threshold after which files are written to disk. Values can use the suffixes "MB" or "KB" to indicate megabytes or kilobytes, respectively.
+      location: ./src/main/resources/ # Intermediate location of uploaded files.
+      max-file-size: -1 # Max file size. Values can use the suffixes "MB" or "KB" to indicate megabytes or kilobytes, respectively.
+      max-request-size: -1 # Max request size. Values can use the suffixes "MB" or "KB" to indicate megabytes or kilobytes, respectively.
+      resolve-lazily: false # Whether to resolve the multipart request lazily at the time of file or parameter access.
