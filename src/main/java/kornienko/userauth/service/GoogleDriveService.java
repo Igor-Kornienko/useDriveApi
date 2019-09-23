@@ -7,7 +7,9 @@ import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.FileContent;
+import com.google.api.client.googleapis.media.MediaHttpUploader;
+import com.google.api.client.http.AbstractInputStreamContent;
+import com.google.api.client.http.InputStreamContent;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
@@ -15,7 +17,7 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
-import org.apache.tika.Tika;
+import kornienko.userauth.listener.FileUploadProgressListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -62,6 +64,35 @@ public class GoogleDriveService {
         return new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize("user");
     }
 
+    private File _createGoogleFile(String googleFolderIdParent, String contentType,
+                                          String customFileName, AbstractInputStreamContent uploadStreamContent, long size) throws IOException {
+
+        File fileMetadata = new File();
+        fileMetadata.setName(customFileName);
+
+        List<String> parents = Collections.singletonList(googleFolderIdParent);
+        fileMetadata.setParents(parents);
+
+        Drive driveService = getDrive();
+
+        Drive.Files.Create createF = driveService.files().create(fileMetadata, uploadStreamContent)
+                .setFields("id, webContentLink, webViewLink, parents");
+
+        MediaHttpUploader uploader = createF.getMediaHttpUploader();
+        uploader.setDirectUploadEnabled(false);
+        uploader.setChunkSize(1024 * 1024 * 8);
+        uploader.setProgressListener(new FileUploadProgressListener(fileMetadata.getName(), size));
+
+        return createF.execute();
+    }
+
+    public File createGoogleFile(String googleFolderIdParent, String contentType,
+                                        String customFileName, InputStream inputStream, long size) throws IOException {
+
+        AbstractInputStreamContent uploadStreamContent = new InputStreamContent(contentType, inputStream);
+        return _createGoogleFile(googleFolderIdParent, contentType, customFileName, uploadStreamContent, size);
+    }
+
     public List<File> getFiles() throws IOException, URISyntaxException {
         System.out.println(SCOPES.toString());
         Drive service = getDrive();
@@ -76,31 +107,13 @@ public class GoogleDriveService {
     public String uploadFile(String name, MultipartFile file){
         if (!file.isEmpty()) {
             try {
-                java.io.File newFile = new java.io.File(name);
+                /*int del = 1024 * 1024;
+                System.out.println("max: " + Runtime.getRuntime().maxMemory() / del);
+                System.out.println("total: " + Runtime.getRuntime().totalMemory() / del);
+                System.out.println("free: " + Runtime.getRuntime().freeMemory() / del);*/
 
-                byte[] bytes = file.getBytes();
-                BufferedOutputStream stream =
-                        new BufferedOutputStream(new FileOutputStream(newFile));
-                stream.write(bytes);
-                stream.close();
-
-                Drive service = getDrive();
-
-                File fileMetadata = new File();
-                fileMetadata.setName(name);
-
-                Tika tika = new Tika();
-                String mimeType = tika.detect(newFile);
-
-                System.out.println("mimetype: " + mimeType);
-
-                FileContent mediaContent = new FileContent(mimeType, newFile);
-                File gFile = service.files().create(fileMetadata, mediaContent)
-                        .setFields("id")
-                        .execute();
-
-                newFile.delete();
-                return "File ID: " + gFile.getId();
+                System.out.println(file.getSize());
+                return "File ID: " + createGoogleFile(null, file.getContentType(), name, file.getInputStream(), file.getSize()).getId();
             } catch (Exception e) {
                 return e.getMessage();
             }
@@ -113,18 +126,7 @@ public class GoogleDriveService {
         Drive service = getDrive();
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        File file = service.files().get(id).execute();
-        service.files().export(id, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .executeAndDownloadTo(outputStream);
-
-        java.io.File newfile = new java.io.File(file.getName() + '.' + file.getFileExtension());
-        newfile.createNewFile();
-
-        FileOutputStream fop = new FileOutputStream(newfile);
-        fop.write(outputStream.toByteArray());
-        fop.flush();
-        fop.close();
-
+        service.files().get(id).executeMediaAndDownloadTo(outputStream);
         return outputStream.toByteArray();
     }
 }
