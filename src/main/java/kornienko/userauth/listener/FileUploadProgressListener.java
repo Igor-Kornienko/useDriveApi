@@ -11,7 +11,7 @@ public class FileUploadProgressListener implements MediaHttpUploaderProgressList
     private String mFileUploadedName;
     private long bytesCount;
 
-    DecimalFormat df = new DecimalFormat("#.####");
+    DecimalFormat df = new DecimalFormat("#.##");
 
     public FileUploadProgressListener(String fileName, long bytesCount) {
         mFileUploadedName = fileName;
@@ -29,9 +29,8 @@ public class FileUploadProgressListener implements MediaHttpUploaderProgressList
                 System.out.println("Initiation is complete!");
                 break;
             case MEDIA_IN_PROGRESS:
-                System.out.println(mediaHttpUploader.getNumBytesUploaded() + "  " + bytesCount);
                 double percent = mediaHttpUploader.getNumBytesUploaded() / (double) bytesCount;
-                System.out.println("Upload: " + mFileUploadedName + " - " + df.format(percent) + "%");
+                System.out.println("Upload: " + mFileUploadedName + " - " + df.format(percent * 100) + "%");
                 break;
             case MEDIA_COMPLETE:
                 System.out.println("Upload is complete!");

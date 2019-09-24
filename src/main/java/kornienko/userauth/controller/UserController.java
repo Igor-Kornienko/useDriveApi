@@ -3,12 +3,15 @@ package kornienko.userauth.controller;
 import com.google.api.services.drive.model.File;
 import kornienko.userauth.service.GoogleDriveService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
-import java.security.GeneralSecurityException;
 import java.security.Principal;
 import java.util.List;
 
@@ -18,8 +21,7 @@ public class UserController {
     GoogleDriveService googleDriveService;
 
     @RequestMapping(value = "/files")
-    public List<File> user(Principal principal) throws IOException, GeneralSecurityException, URISyntaxException {
-        System.out.println("/files");
+    public List<File> user(Principal principal) throws IOException, URISyntaxException {
         return googleDriveService.getFiles();
     }
 
@@ -27,14 +29,13 @@ public class UserController {
     public @ResponseBody
     String handleFileUpload(@RequestParam("file") MultipartFile newFile,
                             @RequestParam("name") String newName) {
-        System.out.println("/upload");
         return googleDriveService.uploadFile(newName, newFile);
     }
 
-    @RequestMapping(value = "/download", method = RequestMethod.POST)
+    @RequestMapping(value = "/download", method = RequestMethod.POST, produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public @ResponseBody
-    byte[] handleFileUpload(@RequestParam("id") String newId) throws IOException {
-        System.out.println("/download");
-        return googleDriveService.downloadFile(newId);
+    void handleFileUpload(@RequestParam("id") String newId, HttpServletRequest request,
+                                        HttpServletResponse response) throws IOException {
+        googleDriveService.downloadFile(newId, request, response);
     }
 }
