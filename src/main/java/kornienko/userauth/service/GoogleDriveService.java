@@ -1,18 +1,18 @@
 package kornienko.userauth.service;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.auth.oauth2.*;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.media.MediaHttpDownloader;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
-import com.google.api.client.http.AbstractInputStreamContent;
-import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.http.*;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
@@ -21,13 +21,12 @@ import kornienko.userauth.listener.FileDownloadProgressListener;
 import kornienko.userauth.listener.FileUploadProgressListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.view.RedirectView;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
-import java.text.DecimalFormat;
 import java.util.Collections;
 import java.util.List;
 
@@ -41,25 +40,51 @@ public class GoogleDriveService {
     private final NetHttpTransport HTTP_TRANSPORT;
 
     private final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE);
-    private final String CREDENTIALS_FILE_PATH = "credentials.json";
+    private final String CLIENT_SECRETS_FILE_PATH = "client_secret.json";
+    private final String ACCESS_TOKEN_FILE_PATH = "access_token.txt";
 
-    public GoogleDriveService() throws GeneralSecurityException, IOException {
+    private static FileDataStoreFactory DATA_STORE_FACTORY;
+
+    private final GoogleClientSecrets clientSecrets;
+    private GoogleAuthorizationCodeFlow flow;
+
+    GoogleCredential credential;
+
+    private GoogleDriveService() throws GeneralSecurityException, IOException {
         HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+
+        clientSecrets = GoogleClientSecrets.load(JSON_FACTORY,
+                new InputStreamReader(new FileInputStream(new java.io.File(CLIENT_SECRETS_FILE_PATH))));
+
+        flow = new GoogleAuthorizationCodeFlow.Builder(
+                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
+                .build();
     }
 
-    private Drive getDrive() throws IOException {
-        return new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials())
+    private Drive getDrive() {
+        return new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
     }
 
-    private Credential getCredentials() throws IOException {
-        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY,
-                new InputStreamReader(new FileInputStream(new java.io.File(CREDENTIALS_FILE_PATH))));
-
-        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
+    public RedirectView urlAuth() {
+         String url = flow.
+                newAuthorizationUrl().
+                setRedirectUri(clientSecrets.getDetails().getRedirectUris().get(1))
+                .setAccessType("offline")
                 .build();
+        return new RedirectView(url);
+    }
+
+    public RedirectView codeExchange(String accessToken) throws IOException {
+        if (!accessToken.equals("")) {
+            GoogleTokenResponse tokenResponse = flow.newTokenRequest(accessToken).setRedirectUri(clientSecrets.getDetails().getRedirectUris().get(1)).execute();
+            credential = new GoogleCredential().setFromTokenResponse(tokenResponse);
+        }
+        return new RedirectView("http://localhost:8080");
+    }
+
+    private Credential getCredentials() throws IOException {
         return new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize("user");
     }
 
@@ -85,14 +110,14 @@ public class GoogleDriveService {
         return createF.execute();
     }
 
-    public File createGoogleFile(String googleFolderIdParent, String contentType,
+    private File createGoogleFile(String googleFolderIdParent, String contentType,
                                         String customFileName, InputStream inputStream, long size) throws IOException {
 
         AbstractInputStreamContent uploadStreamContent = new InputStreamContent(contentType, inputStream);
         return _createGoogleFile(googleFolderIdParent, contentType, customFileName, uploadStreamContent, size);
     }
 
-    public List<File> getFiles() throws IOException, URISyntaxException {
+    public List<File> getFiles() throws IOException {
         System.out.println(SCOPES.toString());
         Drive service = getDrive();
 
